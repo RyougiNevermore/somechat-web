@@ -1,0 +1,13 @@
+body {
+    margin: 0 0 0 0;
+    padding: 0 0 0 0;
+}
+
+.center {
+    position: relative;
+    margin: 0 auto;
+}
+
+.txtCenter {
+    text-align: center;
+}

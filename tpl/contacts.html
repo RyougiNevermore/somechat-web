@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>some chat</title>
+    <script src="/static/js/jquery-3.2.1.min.js"></script>
+    <script src="/static/js/js.cookie-2.1.4.min.js"></script>
+    <link rel="stylesheet" href="/static/css/g.css" />
+</head>
+<body>
+    <div class="center" style="width: 600px;">
+        <div>
+            <h1 class="txtCenter">Contacts</h1>
+        </div>
+        <div style="margin-top: 20px;">
+            <hr>
+            <h3>add contact</h3>
+            <div style="margin-top: 20px;">
+                email:<input type="email" id="email" name="email" value="" style="width: 300px;">
+                &nbsp;&nbsp;&nbsp;
+                <button id="btn_add">Add</button>
+            </div>
+        </div>
+        <div style="margin-top: 20px;">
+            <hr>
+            <h3>contact add request</h3>
+            <ul id="contact_add_req_list">
+                <li style="margin-top: 10px;">
+                    <div>
+                        email:<span></span>
+                        &nbsp;&nbsp;&nbsp;
+                        <button onclick="accept('xxx');">Accept</button>
+                    </div>
+                </li>
+            </ul>
+        </div>
+        <div style="margin-top: 20px;">
+            <hr>
+            <h3>contact list</h3>
+            <ul id="contact_list">
+                <li>
+                    <div>
+                        email:<input type="email" id="contact_email" name="contact_email" value="" style="width: 300px;">
+                        &nbsp;&nbsp;&nbsp;
+                        <button id="btn_chat">Chat</button>
+                    </div>
+                </li>
+                {{range .view.Contacts}}
+                <li style="margin-top: 10px;">
+                    <div>
+                        <span >{{.Name}}</span>
+                        &nbsp;&nbsp;&nbsp;
+                        <span >{{.Email}}</span>
+                        &nbsp;&nbsp;&nbsp;
+                        <span data-unread="{{.Unread}}" style="color: red;">0</span>
+                        &nbsp;&nbsp;&nbsp;
+                        <button data-id="{{.Id}}"
+                                onclick="beginChat(this);">Chat</button>
+                        &nbsp;&nbsp;&nbsp;
+                        <button data-id="{{.Id}}"
+                                onclick="remove(this);">Remove</button>
+                    </div>
+                </li>
+                {{end}}
+            </ul>
+        </div>
+    </div>
+
+<script >
+    function beginChat(_this) {
+        
+    }
+
+    function accept(_fromUserId) {
+
+    }
+
+    function remove(_this) {
+        alert("not implemented.");
+        return false;
+    }
+    
+    $(function () {
+        // ws
+
+        $('#btn_add').click(function () {
+            var _email = $('#email').val();
+            if (_email === "") {
+                alert("email is empty.");
+                return false;
+            }
+            var _userId =  Cookies.get('userId');
+            $.ajax({
+                'type': 'POST'
+                , 'url': '/api/contact/add'
+                , 'data': {
+                    "email": _email
+                    , "userId": _userId
+                }
+                , 'dataType': 'json'
+                , 'success': function (_data) {
+                    console.log(_data);
+                    if (_data.success === false) {
+                        alert(_data.message);
+                        return false;
+                    }
+                    alert(_data.message);
+                }
+                , 'beforeSend': function (_req) {
+                    console.log("before");
+                }
+                , 'complete': function (_xhr, _ts) {
+                    console.log("complete");
+                }
+                , 'error': function (_xhr, _error, _ops) {
+                    console.log(_error);
+                    alert(_error);
+                }
+            });
+        });
+    });
+</script>
+</body>
+</html>

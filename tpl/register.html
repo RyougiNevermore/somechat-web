@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>some chat</title>
+    <script src="/static/js/jquery-3.2.1.min.js"></script>
+    <script src="/static/js/js.cookie-2.1.4.min.js"></script>
+    <link rel="stylesheet" href="/static/css/g.css" />
+</head>
+<body>
+<div class="center" style="width: 400px;">
+    <h1 class="txtCenter">Some Chat</h1>
+    <div style="margin-top: 20px;">
+        name:<input type="email" id="name" name="name" value="">
+    </div>
+    <div style="margin-top: 20px;">
+        email:<input type="email" id="email" name="email" value="">
+    </div>
+    <div style="margin-top: 20px;">
+        password:<input type="password" id="password" name="password" value="">
+    </div>
+    <div style="margin-top: 20px;">
+        password confirm:<input type="password" id="password2" name="password2" value="">
+    </div>
+    <div style="margin-top: 20px;">
+        <button id="btn_register">Register</button>
+    </div>
+    <div style="margin-top: 20px;">
+        <span id="process"></span>
+    </div>
+</div>
+
+<script >
+    $(function () {
+        $('#btn_register').click(function () {
+            var _name = $('#name').val();
+            var _email = $('#email').val();
+            var _password = $('#password').val();
+            var _password2 = $('#password2').val();
+            if (_name === "") {
+                alert("name is empty.");
+                return false;
+            }
+            if (_email === "") {
+                alert("email is empty.");
+                return false;
+            }
+            if (_password === "") {
+                alert("password is empty.");
+                return false;
+            }
+            if (_password !== _password2) {
+                alert("password confirm is bad.");
+                return false;
+            }
+            $.ajax({
+                'type': 'POST'
+                , 'url': '/api/user/register'
+                , 'data': {
+                    "name" : _name
+                    , "email": _email
+                    , "password": _password
+                }
+                , 'dataType': 'json'
+                , 'success': function (_data) {
+                    console.log(_data);
+                    if (_data.success === false) {
+                        alert(_data.message);
+                        return false;
+                    }
+                    Cookies.set('userId', _data.data.userId);
+                    alert(_data.message);
+                    $(window).attr('location', '/contacts');
+
+                }
+                , 'beforeSend': function (_req) {
+                    console.log("before");
+                    setTimeout("$('#progress').append('...');", 500);
+                }
+                , 'complete': function (_xhr, _ts) {
+                    console.log("complete");
+                }
+                , 'error': function (_xhr, _error, _ops) {
+                    console.log(_error);
+                    alert(_error);
+                }
+            });
+
+        });
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html >
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no">
+    <title>some chat</title>
+
+    <script src="/static/js/jquery-3.2.1.min.js"></script>
+    <script src="/static/js/js.cookie-2.1.4.min.js"></script>
+    <link rel="stylesheet" href="/static/css/g.css" />
+</head>
+<body>
+    <div class="center" style="width: 400px;">
+        <h1 class="txtCenter">Some Chat</h1>
+        <div style="margin-top: 20px;">
+            email:<input type="email" id="email" name="email" value="">
+        </div>
+        <div style="margin-top: 20px;">
+            password:<input type="password" id="password" name="password" value="">
+        </div>
+        <div style="margin-top: 20px;">
+            <button id="btn_login">Login</button>
+            <a href="/register" target="_self">Register</a>
+        </div>
+        <div style="margin-top: 20px;">
+            <span id="process"></span>
+        </div>
+    </div>
+
+<script >
+    $(function () {
+        $('#btn_login').click(function () {
+            var _email = $('#email').val();
+            var _password = $('#password').val();
+            if (_email === "") {
+                alert("email is empty.");
+                return false;
+            }
+            if (_password === "") {
+                alert("password is empty.");
+                return false;
+            }
+            $.ajax({
+                'type': 'POST'
+                , 'url': '/api/user/login'
+                , 'data': {
+                    "email": _email
+                    , "password": _password
+                }
+                , 'dataType': 'json'
+                , 'success': function (_data) {
+                    console.log(_data);
+                    if (_data.success === false) {
+                        alert(_data.message);
+                        return false;
+                    }
+                    Cookies.set('userId', _data.data.userId);
+                    alert(_data.message);
+                    $(window).attr('location', '/contacts');
+
+                }
+                , 'beforeSend': function (_req) {
+                    console.log("before");
+                    setTimeout("$('#progress').append('...');", 500);
+                }
+                , 'complete': function (_xhr, _ts) {
+                    console.log("complete");
+                }
+                , 'error': function (_xhr, _error, _ops) {
+                    console.log(_error);
+                    alert(_error);
+                }
+            });
+
+        });
+    });
+</script>
+</body>
+</html>

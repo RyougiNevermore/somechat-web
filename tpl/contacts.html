@@ -4,14 +4,21 @@
     <meta charset="UTF-8">
     <title>some chat</title>
     <script src="/static/js/jquery-3.2.1.min.js"></script>
-    <script src="/static/js/js.cookie-2.1.4.min.js"></script>
+    <script src="/static/js/moment.min.js"></script>
+    <script src="/static/js/moment-with-locales.min.js"></script>
+    <script src="/iris-ws.js"></script>
     <link rel="stylesheet" href="/static/css/g.css" />
 </head>
 <body>
     <div class="center" style="width: 600px;">
         <div>
-            <h1 class="txtCenter">Contacts</h1>
+            <h1 class="txtCenter">{{.view.User.Name}}'s contacts</h1>
         </div>
+        {{if .view.Error}}
+        <div>
+            <p style="color: red;font-size: 24px;font-weight: bold;">{{.view.Error}}</p>
+        </div>
+        {{end}}
         <div style="margin-top: 20px;">
             <hr>
             <h3>add contact</h3>
@@ -23,15 +30,34 @@
         </div>
         <div style="margin-top: 20px;">
             <hr>
-            <h3>contact add request</h3>
+            <h3>contact add request list [accept]</h3>
             <ul id="contact_add_req_list">
-                <li style="margin-top: 10px;">
+                {{range .view.ContactAddRequestToUserList}}
+                <li id="{{.Id}}" style="margin-top: 10px;">
                     <div>
-                        email:<span></span>
-                        &nbsp;&nbsp;&nbsp;
-                        <button onclick="accept('xxx');">Accept</button>
+                        email:<span>{{.FromEmail}}</span>
+                        &nbsp;&nbsp;
+                        name:<span>{{.FromName}}</span>
+                        <button onclick="accept('{{.Id}}');">Accept</button>
+                        <button onclick="reject('{{.Id}}');">Reject</button>
                     </div>
                 </li>
+                {{end}}
+            </ul>
+        </div>
+        <div style="margin-top: 20px;">
+            <hr>
+            <h3>contact add request list [send]</h3>
+            <ul id="contact_add_req_list_history">
+                {{range .view.ContactAddRequestFromUserList}}
+                <li id="{{.Id}}" style="margin-top: 10px;">
+                    <div>
+                        email:<span>{{.FromEmail}}</span>
+                        &nbsp;&nbsp;
+                        name:<span>{{.FromName}}</span>
+                    </div>
+                </li>
+                {{end}}
             </ul>
         </div>
         <div style="margin-top: 20px;">
@@ -40,44 +66,192 @@
             <ul id="contact_list">
                 <li>
                     <div>
-                        email:<input type="email" id="contact_email" name="contact_email" value="" style="width: 300px;">
+                        email:<input type="email" id="any_contact_email" name="contact_email" value="" style="width: 300px;">
                         &nbsp;&nbsp;&nbsp;
-                        <button id="btn_chat">Chat</button>
+                        <button id="btn_chat" onclick="anyChat();">Chat</button>
                     </div>
                 </li>
-                {{range .view.Contacts}}
+                {{range .view.ContactList}}
                 <li style="margin-top: 10px;">
                     <div>
-                        <span >{{.Name}}</span>
+                        <span >{{.UserName}}</span>
                         &nbsp;&nbsp;&nbsp;
-                        <span >{{.Email}}</span>
-                        &nbsp;&nbsp;&nbsp;
-                        <span data-unread="{{.Unread}}" style="color: red;">0</span>
-                        &nbsp;&nbsp;&nbsp;
-                        <button data-id="{{.Id}}"
+                        <span >{{.UserEmail}}</span>
+                        &nbsp;&nbsp;
+
+                        <span data-type="unread_number" data-user="{{.UserId}}" id="unread_{{.UserId}}" style="color: red;">
+                            {{if gt .Unread.Number 0}}
+                            {{.Unread.Number}}
+                            {{end}}
+                        </span>
+
+                        <button data-id="{{.UserId}}" data-unread="{{.Unread.Room}}" id="btn_chat_{{.UserId}}" data-on="0"
                                 onclick="beginChat(this);">Chat</button>
                         &nbsp;&nbsp;&nbsp;
-                        <button data-id="{{.Id}}"
+                        <button data-id="{{.UserId}}"
                                 onclick="remove(this);">Remove</button>
                     </div>
                 </li>
                 {{end}}
             </ul>
         </div>
+        <div id="hit_message" class="center" style="width: 600px; margin-top: 10px; border: solid 1px; "></div>
     </div>
 
 <script >
+
+    var _current_user_id = '{{.view.User.Id}}';
+    var _currnet_user_name = '{{.view.User.Name}}';
+    var _currnet_user_email = '{{.view.User.Email}}';
+
+
     function beginChat(_this) {
-        
+        var _on = $(_this).attr("data-on");
+        if (_on === '1') {
+            alert("the chat window is opened, can not new a chat window.");
+            return false;
+        }
+        var _to_user =  $(_this).attr('data-id');
+        console.log("_to_user: " + _to_user);
+        if (_to_user === undefined && _to_user === '') {
+            alert("failed, can not get this user.");
+            return false;
+        }
+        var _unread = $('#unread_' + _to_user).html();
+        console.log("unread: " + _unread);
+        if (_unread !== undefined && _unread !== '') {
+            $('#unread_' + _to_user).html('');
+        }
+        $(_this).attr("data-on", "1");
+        _and_chat_list[_to_user] = '1';
+        window.open('/chat?from=' + _current_user_id + '&to=' + _to_user);
     }
 
-    function accept(_fromUserId) {
+    function accept(_reqId) {
+        $.ajax({
+            'type': 'POST'
+            , 'url': '/api/contact/add/request/accept'
+            , 'data': {
+                "reqId": _reqId
+                , "userId": _current_user_id
+            }
+            , 'dataType': 'json'
+            , 'success': function (_data) {
+                console.log(_data);
+                if (_data.success === false) {
+                    alert(_data.message);
+                    return false;
+                }
+                alert(_data.message);
+                $('#' + _reqId).remove();
+                var _li = '<li style="margin-top: 10px;"><div>';
+                _li = _li + '<span >' + _data.data.userName + '</span>&nbsp;&nbsp;';
+                _li = _li + '<span >' + _data.data.userEmail + '</span>&nbsp;&nbsp;';
+                _li = _li + '<span data-type="unread_number" data-user="'+ _data.data.userId + '" style="color: red;"></span>' ;
+                _li = _li + '<button data-id="'+ _data.data.userId + '" data-unread="" onclick="beginChat(this);">Chat</button>&nbsp;&nbsp;';
+                _li = _li + '<button data-id="'+ _data.data.userId + '" onclick="remove(this);">Remove</button>';
+                _li = _li + '</div></li>';
+                $('#contact_list').append(_li);
 
+            }
+            , 'beforeSend': function (_req) {
+                console.log("before");
+            }
+            , 'complete': function (_xhr, _ts) {
+                console.log("complete");
+            }
+            , 'error': function (_xhr, _error, _ops) {
+                console.log(_error);
+                alert(_error);
+            }
+        });
+    }
+
+    function reject(_reqId) {
+        $.ajax({
+            'type': 'POST'
+            , 'url': '/api/contact/add/request/reject'
+            , 'data': {
+                "reqId": _reqId
+                , "userId": _current_user_id
+            }
+            , 'dataType': 'json'
+            , 'success': function (_data) {
+                console.log(_data);
+                if (_data.success === false) {
+                    alert(_data.message);
+                    return false;
+                }
+                alert(_data.message);
+                $('#' + _reqId).remove();
+            }
+            , 'beforeSend': function (_req) {
+                console.log("before");
+            }
+            , 'complete': function (_xhr, _ts) {
+                console.log("complete");
+            }
+            , 'error': function (_xhr, _error, _ops) {
+                console.log(_error);
+                alert(_error);
+            }
+        });
     }
 
     function remove(_this) {
         alert("not implemented.");
         return false;
+    }
+
+    var _and_chat_list = {};
+
+    function anyChat() {
+        var _any_contact_email = $('#any_contact_email').val();
+        if (_any_contact_email === undefined || _any_contact_email === '') {
+            alert("no target to send message");
+            return false;
+        }
+        // to make add req
+        $.ajax({
+            'type': 'POST'
+            , 'url': '/api/chat/any'
+            , 'data': {
+                "email": _any_contact_email
+                , "userId": _current_user_id
+            }
+            , 'dataType': 'json'
+            , 'success': function (_data) {
+                console.log(_data);
+                alert(_data.message);
+                if (_data.success === false) {
+                    return false
+                }
+                var _to_user = _data.data.userId;
+
+                if (_to_user === undefined || _to_user === '') {
+                    alert("miss user , email is" + _any_contact_email);
+                    return false
+                }
+                if (_and_chat_list[_to_user] === '1') {
+                    alert("the chat window is opened, can not new a chat window.");
+                    return false;
+                }
+                _and_chat_list[_to_user] = '1';
+                $('#btn_chat_' + _to_user).attr('data-on', '1');
+                window.open('/chat?from=' + _current_user_id + '&to=' + _to_user);
+//                $(window).attr('open', '/chat?from=' + _current_user_id + '&to=' + _to_user);
+            }
+            , 'beforeSend': function (_req) {
+                console.log("before");
+            }
+            , 'complete': function (_xhr, _ts) {
+                console.log("complete");
+            }
+            , 'error': function (_xhr, _error, _ops) {
+                console.log(_error);
+                alert(_error);
+            }
+        });
     }
     
     $(function () {
@@ -89,13 +263,12 @@
                 alert("email is empty.");
                 return false;
             }
-            var _userId =  Cookies.get('userId');
             $.ajax({
                 'type': 'POST'
                 , 'url': '/api/contact/add'
                 , 'data': {
                     "email": _email
-                    , "userId": _userId
+                    , "userId": _current_user_id
                 }
                 , 'dataType': 'json'
                 , 'success': function (_data) {
@@ -105,6 +278,14 @@
                         return false;
                     }
                     alert(_data.message);
+                    // TODO
+                    var _li = '<li id="' + _data.data.id + '" style="margin-top: 10px;">';
+                    _li = _li + '<div>';
+                    _li = _li + 'email:<span>' + _data.data.toUserEmail + '</span>&nbsp;&nbsp;';
+                    _li = _li + 'name:<span>' + _data.data.toUserName + '</span>';
+                    _li = _li + '</div>';
+                    _li = _li + ' </li>';
+                    $('#contact_add_req_list_history').append(_li);
                 }
                 , 'beforeSend': function (_req) {
                     console.log("before");
@@ -118,6 +299,90 @@
                 }
             });
         });
+
+        var socket = new Ws("ws://{{.view.ChatAppServer}}/msg");
+        socket.OnConnect(function () {
+            $('#hit_message').html('Status: Connected');
+            var _msg = {
+                "head":{
+                    "from":_current_user_id,
+                    "contentType":'connect'
+                },
+                "body":""
+            };
+            socket.Emit("notify", JSON.stringify(_msg));
+        });
+
+        socket.OnDisconnect(function () {
+            $('#hit_message').html('Status: Disconnected');
+        });
+
+        socket.On('notify', function (msg) {
+            console.log(msg);
+            var _msg = eval( "(" + msg + ")" );
+            console.log(_msg);
+            if (_msg.head.contentType === 'chat_closed') {
+                // id="btn_chat_{{.UserId}}" data-on="0"
+                var _to_user_id = _msg.head.to;
+                if (_to_user_id === undefined || _to_user_id === '') {
+                    return false
+                }
+                $('#btn_chat_' + _to_user_id).attr('data-on', '0');
+                _and_chat_list[_to_user_id] = '0';
+                console.log(_and_chat_list);
+                console.log($('#btn_chat_' + _to_user_id).html());
+                return false;
+            }
+            if (_msg.head.contentType === 'unread') {
+                var _num = parseInt(_msg.body);
+                var _from = _msg.head.from;
+                var _old_num = $('#unread_' + _from).html();
+                if (_old_num === undefined || _old_num === '') {
+                    $('#unread_' + _from).html(_num);
+                    return false;
+                }
+                _num = _num + parseInt(_old_num);
+                console.log('unread new = ' + _num);
+                $('#unread_' + _from).html(_num);
+                console.log($('#btn_chat_' + _to_user_id).html());
+                return false;
+            }
+            if  (_msg.head.contentType === 'contact_add_req') {
+                var _data = eval( "(" + _msg.body + ")" );
+                if (_data.action === 'new') {
+                    var _li = '<li id="' + _msg.head.reqId + '" style="margin-top: 10px;">';
+                    _li = _li + '<div>';
+                    _li = _li + ' email:<span>' + _msg.head.fromEmail + '</span>&nbsp;&nbsp;';
+                    _li = _li + 'name:<span>' + _msg.head.fromName + '</span>';
+                    _li = _li + ' <button onclick="accept(\'' + _msg.head.reqId + '\');">Accept</button>';
+                    _li = _li + '<button onclick="reject(\'' + _msg.head.reqId + '\');">Reject</button>';
+                    _li = _li + '</div>';
+                    _li = _li + '</li>';
+                    console.log("new");
+                    console.log(_li);
+                    $('#contact_add_req_list').append(_li);
+                }
+                if (_data.action === 'reject') {
+                    $('#' + _data.reqId).append('<span style="color: red;">&nbsp;&nbsp;reject</span>');
+                    return false;
+                }
+                if (_data.action === 'accept') {
+                    $('#' + _msg.head.reqId).append('<span style="color: red;">&nbsp;&nbsp;accept</span>');
+                    var _li = '<li style="margin-top: 10px;"><div>';
+                    _li = _li + '<span >' + _msg.head.userName + '</span>&nbsp;&nbsp;&nbsp;<span >' + _msg.head.userEmail + '</span> &nbsp;&nbsp;';
+                    _li = _li + '<span data-type="unread_number" data-user="' + _msg.head.userId + '" id="unread_' + _msg.head.userId + '" style="color: red;"></span>';
+                    _li = _li + '<button data-id="' + _msg.head.userId + '" data-unread="{{.Unread.Room}}" id="btn_chat_' + _msg.head.userId + '" data-on="0" onclick="beginChat(this);">Chat</button>';
+                    _li = _li + '&nbsp;&nbsp;&nbsp;';
+                    _li = _li + '<button data-id="' + _msg.head.userId + '" onclick="remove(this);">Remove</button>';
+                    _li = _li + '</div>';
+                    _li = _li + '</li>';
+                    $('#contact_list').append(_li);
+                    return false;
+                }
+            }
+        });
+
+
     });
 </script>
 </body>

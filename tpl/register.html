@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>some chat</title>
     <script src="/static/js/jquery-3.2.1.min.js"></script>
-    <script src="/static/js/js.cookie-2.1.4.min.js"></script>
     <link rel="stylesheet" href="/static/css/g.css" />
 </head>
 <body>
@@ -68,9 +67,8 @@
                         alert(_data.message);
                         return false;
                     }
-                    Cookies.set('userId', _data.data.userId);
                     alert(_data.message);
-                    $(window).attr('location', '/contacts');
+                    $(window).attr('location', '/contacts?userId=' + _data.data.userId);
 
                 }
                 , 'beforeSend': function (_req) {

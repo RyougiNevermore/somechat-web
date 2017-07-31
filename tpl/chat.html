@@ -4,14 +4,285 @@
     <meta charset="UTF-8">
     <title>some chat</title>
     <script src="/static/js/jquery-3.2.1.min.js"></script>
-    <script src="/static/js/js.cookie-2.1.4.min.js"></script>
+    <script src="/static/js/moment.min.js"></script>
+    <script src="/static/js/moment-with-locales.min.js"></script>
+    <script src="/iris-ws.js"></script>
     <link rel="stylesheet" href="/static/css/g.css" />
+    <style type="text/css" >
+        .msg_other {
+            width: 540px; margin-top: 10px; margin-left: 28px; margin-right: 28px;
+        }
+        .msg_me {
+            width: 540px; margin-top: 10px; margin-left: 28px; margin-right: 28px; text-align: right;
+        }
+    </style>
 </head>
 <body>
     <div class="center">
         <div>
-            <h1 class="txtCenter">Chat</h1>
+            <h1 class="txtCenter">Chat&nbsp;:&nbsp;{{.view.User.Name}}&nbsp;-&nbsp;{{.view.ToUser.Name}}</h1>
         </div>
+        {{if .view.Error}}
+        <div  class="center" style="width: 600px;">
+            <p style="color: red;font-size: 24px;font-weight: bold;">{{.view.Error}}</p>
+        </div>
+        {{end}}
+        <div class="center" style="width: 600px;">
+            <button onclick="showMoreHistory();" style="background-color: #3f51b5; color: white;">show more message history</button>
+        </div>
+        <div id="chat_messages"  class="center" style="width: 600px; height: 500px; overflow-y: auto; overflow-x: inherit; border: solid 1px; margin-top: 10px;">
+
+            {{range .view.MessageList}}
+            {{if .My}}
+            <div id="{{.Id}}" class="msg_me">
+                <p  style="font-size: 14px;">{{.UserName}}({{.UserEmail}})&nbsp;&nbsp;{{.CreateTime}} &nbsp;&nbsp;<button onclick="removeMsg('{{.Id}}');">remove</button></p>
+                <p style="font-size: 14px;">{{.Content | unescaped}}</p>
+                <hr style="width: 96%;">
+            </div>
+
+            {{else}}
+            <div  class="msg_other">
+                <p  style="font-size: 14px;">{{.UserName}}({{.UserEmail}})&nbsp;&nbsp;{{.CreateTime}}</p>
+                <p style="font-size: 14px;">{{.Content | unescaped}}</p>
+                <hr style="width: 96%;">
+            </div>
+
+            {{end}}
+            {{end}}
+        </div>
+        <div class="center" style="width: 600px; margin-top: 10px; border: solid 1px; ">
+            <table width="100%" border="0">
+                <tr>
+                    <td width="">
+                        <textarea id="chat_send_content" style="height: 90px; width: 480px;"></textarea>
+                    </td>
+                    <td align="right" width="102px;">
+                        <button id="btn_send" style="width: 100px; height: 100px; background-color: #1E88E5; color: white;">Send</button>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div id="hit_message" class="center" style="width: 600px; margin-top: 10px; border: solid 1px; "></div>
     </div>
+
+<script type="text/javascript">
+    var _current_user_id = '{{.view.User.Id}}';
+    var _currnet_user_name = '{{.view.User.Name}}';
+    var _currnet_user_email = '{{.view.User.Email}}';
+
+    var _to_user_id = '{{.view.ToUser.Id}}';
+    var _to_user_name = '{{.view.ToUser.Name}}';
+    var _to_user_email = '{{.view.ToUser.Email}}';
+
+    var _chat_history_offset = 0;
+    var _chat_history_limit = 10;
+    var _chat_history_index = {{.view.Index}};
+    
+    function showMoreHistory() {
+        console.log("his = " + _chat_history_index);
+        $.ajax({
+            'type': 'POST'
+            , 'url': '/api/chat/history'
+            , 'data': {
+                "fromId": _current_user_id
+                , "toId": _to_user_id
+                , "offset": _chat_history_offset
+                , "limit": _chat_history_limit
+                , "index": _chat_history_index
+            }
+            , 'dataType': 'json'
+            , 'success': function (_data) {
+                console.log(_data);
+                if (_data.success === false) {
+                    alert(_data.message);
+                    return false;
+                }
+                var _row = '';
+                for (var _i = 0; _i < _data.data.list.length ; _i ++) {
+                    var _item = _data.data.list[_i];
+                    if (_item.my === true) {
+                        _row = _row + '<div id="'+ _item.id + '" class="msg_me">';
+                        _row = _row + '<p  style="font-size: 14px;">'+_item.userName+'('+_item.userEmail+')&nbsp;&nbsp;'+_item.createTime+' &nbsp;&nbsp;<button onclick="removeMsg(\''+_item.id+'\');">remove</button></p>';
+
+                    } else {
+                        _row = _row + '<div class="msg_other">';
+                        _row = _row + '<p  style="font-size: 14px;">'+_item.userName+'('+_item.userEmail+')&nbsp;&nbsp;'+_item.createTime+' </p>';
+
+                    }
+                   _row = _row + '<p style="font-size: 14px;">'+_item.content+'</p>';
+                    _row = _row + ' <hr style="width: 96%;">';
+                    _row = _row + '</div>';
+
+                    console.log(_row);
+                    if (_i === 0) {
+                        _chat_history_index = _item.index;
+                    }
+                }
+                $('#chat_messages').prepend(_row);
+                _chat_history_offset = _chat_history_offset + _chat_history_limit;
+
+
+            }
+            , 'beforeSend': function (_req) {
+                console.log("before");
+            }
+            , 'complete': function (_xhr, _ts) {
+                console.log("complete");
+            }
+            , 'error': function (_xhr, _error, _ops) {
+                console.log(_error);
+                alert(_error);
+            }
+        });
+    }
+
+    function removeMsg(_id) {
+        $.ajax({
+            'type': 'POST'
+            , 'url': '/api/chat/message/remove'
+            , 'data': {
+                "msgId": _id
+                , "userId": _current_user_id
+            }
+            , 'dataType': 'json'
+            , 'success': function (_data) {
+                console.log(_data);
+                if (_data.success === false) {
+                    alert(_data.message);
+                    return false;
+                }
+                $('#' + _id).remove();
+
+            }
+            , 'beforeSend': function (_req) {
+                console.log("before");
+            }
+            , 'complete': function (_xhr, _ts) {
+                console.log("complete");
+            }
+            , 'error': function (_xhr, _error, _ops) {
+                console.log(_error);
+                alert(_error);
+            }
+        });
+
+    }
+
+
+    $(function () {
+        var socket = new Ws("ws://{{.view.ChatAppServer}}/msg");
+
+        socket.OnConnect(function () {
+            $('#hit_message').html('Status: Connected');
+            var _msg = {
+                "head":{
+                    "from":_current_user_id,
+                    "to":_to_user_id
+                },
+                "body":""
+            };
+            socket.Emit("room", JSON.stringify(_msg));
+        });
+
+        socket.OnDisconnect(function () {
+            $('#hit_message').html('Status: Disconnected');
+            var _msg = {
+                "head":{
+                    "contentType": 'chat_closed',
+                    "from":_current_user_id,
+                    "to":_to_user_id
+                },
+                "body":""
+            };
+            socket.Emit("notify", JSON.stringify(_msg));
+        });
+
+        socket.On('chat', function (msg) {
+            console.log(msg);
+            var _msg = eval( "(" + msg + ")" );
+            var _date = moment(_msg.head.createTime, "YYYY-MM-DD HH:mm:ss").format("YYYY-MM-DD HH:mm:ss");
+            var _content = _msg.body;
+            _content = _content.replace(/\r\n/g, "\n");
+            _content = _content.replace(/\n\r/g, "\n");
+            _content = _content.replace(/\r/g, "\n");
+            _content = _content.replace(/\n/g, "<br>");
+            var _row = '';
+            _row = _row + '<div class="msg_other">';
+            _row = _row + '<p  style="font-size: 14px;">'+ _to_user_name +'(' + _to_user_email + ')&nbsp;&nbsp;' + _date + ' &nbsp;&nbsp;</p>';
+
+            _row = _row + '<p style="font-size: 14px;">'+_content+'</p>';
+            _row = _row + ' <hr style="width: 96%;">';
+            _row = _row + '</div>';
+
+            console.log(_row);
+            $('#chat_messages').append(_row);
+        });
+
+
+        $('#btn_send').click(function () {
+            var $box = $('#chat_send_content');
+            var _content = $box.val();
+            if (_content === undefined || _content === '') {
+                alert('can not send empty message.');
+                return false;
+            }
+            $.ajax({
+                'type': 'POST'
+                , 'url': '/api/chat/message/id/new'
+                , 'data': {
+                }
+                , 'dataType': 'json'
+                , 'success': function (_data) {
+                    console.log(_data);
+                    if (_data.success === false) {
+                        alert(_data.message);
+                        return false;
+                    }
+                   var _msg_id = _data.data.id;
+                    var _msg = {
+                        "head":{
+                            "id": _msg_id,
+                            "from":_current_user_id,
+                            "to":_to_user_id
+                        },
+                        "body":_content
+                    };
+                    socket.Emit("chat", JSON.stringify(_msg));
+                    _content = _content.replace(/\r\n/g, "\n");
+                    _content = _content.replace(/\n\r/g, "\n");
+                    _content = _content.replace(/\r/g, "\n");
+                    _content = _content.replace(/\n/g, "<br>");
+                    // append
+                    var _row = '';
+                    _row = _row + '<div id="' + _msg_id + '" class="msg_me">';
+                    _row = _row + '<p  style="font-size: 14px;">'+ _currnet_user_name +'(' + _currnet_user_email + ')&nbsp;&nbsp;' + moment(new Date()).format("YYYY-MM-DD HH:mm:ss") + ' &nbsp;&nbsp;<button onclick="removeMsg(\''+_msg_id+'\');">remove</button></p>';
+
+                    _row = _row + '<p style="font-size: 14px;">'+_content+'</p>';
+                    _row = _row + ' <hr style="width: 96%;">';
+                    _row = _row + '</div>';
+
+                    console.log(_row);
+                    $('#chat_messages').append(_row);
+                    // clear
+                    $box.val('');
+                }
+                , 'beforeSend': function (_req) {
+                    console.log("before");
+                }
+                , 'complete': function (_xhr, _ts) {
+                    console.log("complete");
+                }
+                , 'error': function (_xhr, _error, _ops) {
+                    console.log(_error);
+                    alert(_error);
+                }
+            });
+
+        });
+
+
+    });
+
+</script>
 </body>
 </html>
